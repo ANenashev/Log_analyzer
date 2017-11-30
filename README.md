@@ -9,6 +9,14 @@
 * LOG_PATH: "./log_analyzer.log" - файл логов анализатора
 * TS_PATH: "./log_nalyzer.ts" - файл timestamp
 
-Для запуска нужно ввести python log_analyzer.py. Можно указать файл конфигурации в параметре --config: python log_analyzer.py --config "path/to/config.file".
+#### Запуск:
 
-Для запуска тестов нужно ввести python test_log_analyzer.py.
+```bash
+$ python log_analyzer.py --config "path\to\config.file"
+```
+
+#### Тестирование:
+
+```bash
+$ python test_log_analyzer.py
+```
