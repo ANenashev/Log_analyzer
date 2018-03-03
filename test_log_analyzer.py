@@ -10,27 +10,40 @@ class FunctionsTest(unittest.TestCase):
     
     def setUp(self):
         self.config = {
-            "REPORT_SIZE": 100,
+            "REPORT_SIZE": 1000,
             "REPORT_DIR": "./reports",
             "LOG_DIR": "./log",
-            "LOG_PATH": "./log_analyzer.log",
             "TS_PATH": "./log_nalyzer.ts"
         }
     
     def test_parse_config(self):
+
+        # Empty config
+        content = []
+        self.assertEqual(parse_config(content, self.config), self.config)
+
+        # Override and add values
         content = ['REPORT_SIZE: 100\n', 
                    'REPORT_DIR: "./reports"\n',
                    'LOG_DIR: "./log"',
-                   'LOG_PATH: "./log_analyzer.log"',
+                   'LOG_PATH: "./new_folder/log_analyzer.log"',
                    'TS_PATH: "./log_nalyzer.ts"']
-        
-        self.assertEqual(parse_config(content), self.config)
-        
-    def test_get_last_report_date(self):        
+
+        result = {
+            "REPORT_SIZE": 100,
+            "REPORT_DIR": "./reports",
+            "LOG_DIR": "./log",
+            "LOG_PATH": "./new_folder/log_analyzer.log",
+            "TS_PATH": "./log_nalyzer.ts"
+        }
+        self.assertEqual(parse_config(content, self.config), result)
+
+    def test_get_last_report_date(self):
         
         with patch('os.listdir') as mocked_listdir:
             
-            mocked_listdir.return_value = ['report-2017.06.30.html', 'report-2017.07.01.html']
+            mocked_listdir.return_value = ['report-2017.06.30.html',
+                                           'report-2017.07.01.html']
             
             self.assertEqual(get_last_report_date(self.config), datetime(2017, 7, 1, 0, 0, 0))
             
@@ -43,7 +56,8 @@ class FunctionsTest(unittest.TestCase):
                 
                 mocked_listdir.return_value = ['other_log.log-20170630.gz',
                                                'nginx-access-ui.log-20170701.gz',
-                                               'nginx-access-ui.log-20170702']
+                                               'nginx-access-ui.log-20170702',
+                                               'file.txt']
                 
                 log_file_names, log_dates = get_log_list(self.config)
                 
@@ -98,7 +112,7 @@ class FunctionsTest(unittest.TestCase):
                                    b'1.168.65.96 -  - [29/Jun/2017:03:50:23 +0300] "GET /api/v2/internal/banner/24288647/info HTTP/1.1" 200 351 "-" "-" "-" "1498697423-2539198130-4708-9752780" "89f7f1be37d" 0.072\n',
                                    b'1.169.137.128 -  - [29/Jun/2017:03:50:23 +0300] "GET /api/v2/banner/21456892 HTTP/1.1" 200 70795 "-" "Slotovod" "-" "1498697423-2118016444-4708-9752779" "712e90144abee9" 0.158\n']
             
-            json_table = count_stats("test_path", self.config)
+            json_table = count_stats("test_path", self.config["REPORT_SIZE"])
             
             self.assertEqual(json_table, result)
         

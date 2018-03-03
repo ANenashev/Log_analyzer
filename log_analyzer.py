@@ -16,6 +16,7 @@ import re
 #                     '$request_time';
 
 TEMPLATES_DIR = "./templates"
+MAX_PARSING_ERRORS = 200
 
 
 def parse_config(conf_content, default_config):
@@ -47,15 +48,16 @@ def get_log_list(config):
     log_file_names = []
     log_dates = []
 
-    datepat = re.compile(r'(\S+)-(\d+)(\S+)')
+    datepat = re.compile(r'nginx-access-ui.log-(\d+)')
 
     for name in os.listdir(config["LOG_DIR"]):
 
-        date = datetime.strptime(datepat.match(name).group(2), "%Y%m%d")
+        if datepat.match(name) is not None:
+            date = datetime.strptime(datepat.match(name).group(1), "%Y%m%d")
 
-        if date > last_report_date:
-            log_file_names.append(name)
-            log_dates.append(date)
+            if date > last_report_date:
+                log_file_names.append(name)
+                log_dates.append(date)
 
     return log_file_names, log_dates
 
@@ -76,11 +78,14 @@ def count_stats(log_path, report_size):
     count = {}
     times = {}
     links = []
-    count_total = 0
+    count_processed = 0
+    count_total = -1
     time_total = 0
+    errors = 0
 
     for line in get_log_line(log_path):
         parsed_line = line.split()
+        count_total += 1
         try:
             link = parsed_line[6].decode('utf-8')
             links.append(link)
@@ -89,13 +94,20 @@ def count_stats(log_path, report_size):
             times[link] = times.get(link, list())
             times[link].append(current_time)
 
-            count_total += 1
+            count_processed += 1
             time_total += current_time
 
         except:
             logging.exception("String %d of %s didn't parsed" %
                               (count_total, log_path))
+            errors += 1
+            if errors > MAX_PARSING_ERRORS:
+                logging.error("Too many parsing errors. Exiting parsing")
+                return None
+
             continue
+
+
 
     unique_links = set(links)
 
@@ -121,7 +133,7 @@ def count_stats(log_path, report_size):
 
         time_max[link] = max(times[link])
         time_perc[link] = time_sum[link] / time_total
-        count_perc[link] = count[link] / count_total
+        count_perc[link] = count[link] / count_processed
 
     slowest_links = [x[0] for x in sorted(time_sum.items(), key=itemgetter(1))[-report_size:]]
 
@@ -140,11 +152,19 @@ def count_stats(log_path, report_size):
     return table_json
 
 
-'''def count_stats(log_path, report_size):
+'''
+def count_stats(log_path, report_size):
     links_stat = {}
-    columns = ["count", "time_avg", "time_max", "time_sum", "time_med", "time_perc", "count_perc", "times_list"]
-    default_link_stat = dict(zip(columns, (0, 0, 0, 0, 0, 0, 0, 0, 0)))
-    default_link_stat["times_list"] = list()
+    col_map = {"count":0,
+               "time_avg":1,
+               "time_max":2,
+               "time_sum":3,
+               "time_med":4,
+               "time_perc":5,
+               "count_perc":6,
+               "times_list":7}
+    default_link_stat = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    default_link_stat[col_map["times_list"]] = list()
     count_total = 0
     time_total = 0
 
@@ -154,25 +174,25 @@ def count_stats(log_path, report_size):
         try:
             link = parsed_line[6].decode('utf-8')
             cur_link_stat = links_stat.get(link, default_link_stat)
-            cur_link_stat["count"] += 1
+            cur_link_stat[col_map["count"]] += 1
             count_total += 1
             current_time = float(parsed_line[-1])
             time_total += current_time
-            cur_link_stat["times_list"].append(current_time)
-            cur_link_stat["time_sum"] += current_time
-            #cur_link_stat["time_avg"] = cur_link_stat["time_sum"] / cur_link_stat["count"]
-            if current_time > cur_link_stat["time_max"]:
-                cur_link_stat["time_max"] = current_time
-            #cur_link_stat["time_perc"] = cur_link_stat["time_sum"] / time_total
-            #cur_link_stat["count_perc"] = cur_link_stat["count"] / count_total
+            cur_link_stat[col_map["times_list"]].append(current_time)
+            cur_link_stat[col_map["time_sum"]] += current_time
+            # cur_link_stat["time_avg"] = cur_link_stat["time_sum"] / cur_link_stat["count"]
+            if current_time > cur_link_stat[col_map["time_max"]]:
+                cur_link_stat[col_map["time_max"]] = current_time
+            # cur_link_stat["time_perc"] = cur_link_stat["time_sum"] / time_total
+            # cur_link_stat["count_perc"] = cur_link_stat["count"] / count_total
 
             # times_len = len(cur_link_stat["times_list"])
             # sorted_times = sorted(cur_link_stat["times_list"])
             #
             # if (times_len % 2) == 0:
-            #     cur_link_stat["times_med"] = sum(sorted_times[int((times_len / 2) - 1):int(times_len / 2)]) / 2.
+            #     cur_link_stat["time_med"] = sum(sorted_times[int((times_len / 2) - 1):int(times_len / 2)]) / 2.
             # else:
-            #     cur_link_stat["times_med"] = sorted_times[int(math.floor(times_len / 2))]
+            #     cur_link_stat["time_med"] = sorted_times[int(math.floor(times_len / 2))]
 
             links_stat[link] = cur_link_stat
 
@@ -182,32 +202,32 @@ def count_stats(log_path, report_size):
             continue
 
     for link, cur_link_stat in links_stat.items():
-        cur_link_stat["time_avg"] = cur_link_stat["time_sum"] / cur_link_stat["count"]
-        cur_link_stat["time_perc"] = cur_link_stat["time_sum"] / time_total
-        cur_link_stat["count_perc"] = cur_link_stat["count"] / count_total
-        times_len = len(cur_link_stat["times_list"])
-        sorted_times = sorted(cur_link_stat["times_list"])
+        cur_link_stat[col_map["time_avg"]] = cur_link_stat[col_map["time_sum"]] / cur_link_stat[col_map["count"]]
+        cur_link_stat[col_map["time_perc"]] = cur_link_stat[col_map["time_sum"]] / time_total
+        cur_link_stat[col_map["count_perc"]] = cur_link_stat[col_map["count"]] / count_total
+        times_len = len(cur_link_stat[col_map["times_list"]])
+        sorted_times = sorted(cur_link_stat[col_map["times_list"]])
 
         if (times_len % 2) == 0:
-            cur_link_stat["times_med"] = sum(sorted_times[int((times_len / 2) - 1):int(times_len / 2)]) / 2.
+            cur_link_stat[col_map["time_med"]] = sum(sorted_times[int((times_len / 2) - 1):int(times_len / 2)]) / 2.
         else:
-            cur_link_stat["times_med"] = sorted_times[int(math.floor(times_len / 2))]
+            cur_link_stat[col_map["time_med"]] = sorted_times[int(math.floor(times_len / 2))]
 
         links_stat[link] = cur_link_stat
 
-    slowest_links = [x[0] for x in sorted(links_stat.items(), key=lambda k: k[1]["time_avg"])[-report_size:]]
+    slowest_links = [x[0] for x in sorted(links_stat.items(), key=lambda k: k[1][col_map["time_avg"]])[-report_size:]]
 
     table_json = []
 
     for link in slowest_links:
-        table_json.append({"count": links_stat[link]["count"],
-                           "time_avg": links_stat[link]["time_avg"],
-                           "time_max": links_stat[link]["time_max"],
-                           "time_sum": links_stat[link]["time_sum"],
+        table_json.append({"count": links_stat[link][col_map["count"]],
+                           "time_avg": links_stat[link][col_map["time_avg"]],
+                           "time_max": links_stat[link][col_map["time_max"]],
+                           "time_sum": links_stat[link][col_map["time_sum"]],
                            "url": link,
-                           "time_med": links_stat[link]["time_med"],
-                           "time_perc": links_stat[link]["time_perc"],
-                           "count_perc": links_stat[link]["count_perc"]})
+                           "time_med": links_stat[link][col_map["time_med"]],
+                           "time_perc": links_stat[link][col_map["time_perc"]],
+                           "count_perc": links_stat[link][col_map["count_perc"]]})
 
     return table_json
 '''
@@ -239,7 +259,44 @@ def parse_args():
     return config
 
 
-def main():
+def main(config):
+    log_filenames, log_dates = get_log_list(config)
+
+    if len(log_filenames) > 0:
+
+        for i, log_to_parse in enumerate(log_filenames):
+            logging.info("Parsing file %s" % log_to_parse)
+
+            # create report json table
+            report_table = count_stats(os.path.join(config["LOG_DIR"], log_to_parse), config["REPORT_SIZE"])
+
+            if report_table is not None:
+                # create report file
+                report = open(os.path.join(TEMPLATES_DIR, 'report.html'), 'r')
+                text = report.read()
+                report.close()
+
+                text = text.replace('$table_json', str(report_table))
+                report_file = 'report-%s.html' % (log_dates[i].strftime('%Y.%m.%d'))
+
+                with open(os.path.join(config['REPORT_DIR'], report_file), 'w') as out:
+                    out.write(text)
+                logging.info("File %s created successfully." % report_file)
+
+                end_timestamp = datetime.now()
+
+                with open(config["TS_PATH"], 'w') as ts:
+                    ts.write(str(int(end_timestamp.timestamp())))
+                    ts.mtime = int(end_timestamp.timestamp())
+            else:
+                logging.info("File %s was not processed." % log_to_parse)
+
+    else:
+
+        logging.info("No log files to parse")
+
+
+if __name__ == "__main__":
 
     config = parse_args()
 
@@ -257,38 +314,7 @@ def main():
             level=logging.INFO,
             handlers=[logging.StreamHandler(sys.stdout)])
 
-    log_filenames, log_dates = get_log_list(config)
-
-    if len(log_filenames) > 0:
-
-        for i, log_to_parse in enumerate(log_filenames):
-            logging.info("Parsing file %s" % log_to_parse)
-
-            # create report json table
-            report_table = count_stats(os.path.join(config["LOG_DIR"], log_to_parse), config["REPORT_SIZE"])
-
-            # create report file
-            report = open(os.path.join(TEMPLATES_DIR, 'report.html'), 'r')
-            text = report.read()
-            report.close()
-
-            text = text.replace('$table_json', str(report_table))
-            report_file = 'report-%s.html' % (log_dates[i].strftime('%Y.%m.%d'))
-
-            with open(os.path.join(config['REPORT_DIR'], report_file), 'w') as out:
-                out.write(text)
-            logging.info("File %s created successfully." % report_file)
-
-            end_timestamp = datetime.now()
-
-            with open(config["TS_PATH"], 'w') as ts:
-                ts.write(str(int(end_timestamp.timestamp())))
-                ts.mtime = int(end_timestamp.timestamp())
-
-    else:
-
-        logging.info("No log files to parse")
-
-
-if __name__ == "__main__":
-    main()
+    try:
+        main(config)
+    except Exception as e:
+        logging.exception(str(e))
