@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import patch
 from datetime import datetime
-from log_analyzer import parse_config, get_last_report_date, get_log_list, count_stats
+from log_analyzer import parse_config, get_last_report_date, get_last_log, count_stats
 
 
 class FunctionsTest(unittest.TestCase):
@@ -39,58 +39,46 @@ class FunctionsTest(unittest.TestCase):
         self.assertEqual(parse_config(content, self.config), result)
 
     def test_get_last_report_date(self):
-        
         with patch('os.listdir') as mocked_listdir:
-            
             mocked_listdir.return_value = ['report-2017.06.30.html',
                                            'report-2017.07.01.html']
-            
             self.assertEqual(get_last_report_date(self.config), datetime(2017, 7, 1, 0, 0, 0))
             
-    def test_get_log_list(self):
-        
+    def test_get_last_log(self):
         with patch('log_analyzer.get_last_report_date') as mocked_report_date:
             with patch('os.listdir') as mocked_listdir:
-                
                 mocked_report_date.return_value = datetime(2000, 1, 1, 0, 0, 0)
-                
                 mocked_listdir.return_value = ['other_log.log-20170630.gz',
                                                'nginx-access-ui.log-20170701.gz',
                                                'nginx-access-ui.log-20170702',
                                                'file.txt']
-                
-                log_file_names, log_dates = get_log_list(self.config)
-                
-                self.assertEqual(log_file_names, ['nginx-access-ui.log-20170701.gz',
-                                                  'nginx-access-ui.log-20170702'])
-                
-                self.assertEqual(log_dates, [datetime(2017, 7, 1, 0, 0, 0),
-                                             datetime(2017, 7, 2, 0, 0, 0)])
+                log_file_name, log_date = get_last_log(self.config)
+                self.assertEqual(log_file_name, 'nginx-access-ui.log-20170702')
+                self.assertEqual(log_date, datetime(2017, 7, 2, 0, 0, 0))
                 
     def test_count_stats(self):
-        result = [{'count': 1, 'time_avg': 0.001, 'time_max': 0.001, 'time_sum': 0.001, 'url': '/export/appinstall_raw/2017-06-30/', 'time_med': 0.001, 'time_perc': 0.00015487068297971194, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.003, 'time_max': 0.003, 'time_sum': 0.003, 'url': '/export/appinstall_raw/2017-06-29/', 'time_med': 0.003, 'time_perc': 0.00046461204893913583, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.067, 'time_max': 0.067, 'time_sum': 0.067, 'url': '/api/v2/group/7786679/statistic/sites/?date_type=day&date_from=2017-06-28&date_to=2017-06-28', 'time_med': 0.067, 'time_perc': 0.010376335759640701, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.068, 'time_max': 0.068, 'time_sum': 0.068, 'url': '/api/v2/group/7786682/statistic/sites/?date_type=day&date_from=2017-06-28&date_to=2017-06-28', 'time_med': 0.068, 'time_perc': 0.010531206442620412, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.072, 'time_max': 0.072, 'time_sum': 0.072, 'url': '/api/v2/internal/banner/24288647/info', 'time_med': 0.072, 'time_perc': 0.01115068917453926, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.133, 'time_max': 0.133, 'time_sum': 0.133, 'url': '/api/1/photogenic_banners/list/?server_name=WIN7RB4', 'time_med': 0.133, 'time_perc': 0.02059780083630169, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.138, 'time_max': 0.138, 'time_sum': 0.138, 'url': '/api/v2/banner/1717161', 'time_med': 0.138, 'time_perc': 0.02137215425120025, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.146, 'time_max': 0.146, 'time_sum': 0.146, 'url': '/api/v2/internal/banner/24294027/info', 'time_med': 0.146, 'time_perc': 0.02261111971503794, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.157, 'time_max': 0.157, 'time_sum': 0.157, 'url': '/api/v2/slot/4822/groups', 'time_med': 0.157, 'time_perc': 0.024314697227814774, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.158, 'time_max': 0.158, 'time_sum': 0.158, 'url': '/api/v2/banner/21456892', 'time_med': 0.158, 'time_perc': 0.024469567910794486, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.181, 'time_max': 0.181, 'time_sum': 0.181, 'url': '/api/v2/banner/7763463', 'time_med': 0.181, 'time_perc': 0.02803159361932786, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.19, 'time_max': 0.19, 'time_sum': 0.19, 'url': '/api/v2/banner/16168711', 'time_med': 0.19, 'time_perc': 0.029425429766145268, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.199, 'time_max': 0.199, 'time_sum': 0.199, 'url': '/api/v2/banner/16852664', 'time_med': 0.199, 'time_perc': 0.03081926591296268, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.39, 'time_max': 0.39, 'time_sum': 0.39, 'url': '/api/v2/banner/25019354', 'time_med': 0.39, 'time_perc': 0.06039956636208766, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.628, 'time_max': 0.628, 'time_sum': 0.628, 'url': '/api/v2/group/1769230/banners', 'time_med': 0.628, 'time_perc': 0.0972587889112591, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.704, 'time_max': 0.704, 'time_sum': 0.704, 'url': '/api/v2/slot/4705/groups', 'time_med': 0.704, 'time_perc': 0.10902896081771721, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.726, 'time_max': 0.726, 'time_sum': 0.726, 'url': '/api/v2/banner/24987703', 'time_med': 0.726, 'time_perc': 0.11243611584327087, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.738, 'time_max': 0.738, 'time_sum': 0.738, 'url': '/api/v2/banner/25020545', 'time_med': 0.738, 'time_perc': 0.11429456403902741, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.841, 'time_max': 0.841, 'time_sum': 0.841, 'url': '/api/v2/banner/25023278', 'time_med': 0.841, 'time_perc': 0.13024624438593774, 'count_perc': 0.05},
-                  {'count': 1, 'time_avg': 0.917, 'time_max': 0.917, 'time_sum': 0.917, 'url': '/api/v2/banner/25013431', 'time_med': 0.917, 'time_perc': 0.14201641629239586, 'count_perc': 0.05}]
+        result = [{'url': '/api/v2/banner/25019354', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.39, 'time_max': 0.39, 'time_sum': 0.39, 'time_perc': 6.04, 'time_med': 0.39},
+         {'url': '/api/1/photogenic_banners/list/?server_name=WIN7RB4', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.133, 'time_max': 0.133, 'time_sum': 0.133, 'time_perc': 2.06, 'time_med': 0.133},
+         {'url': '/api/v2/banner/16852664', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.199, 'time_max': 0.199, 'time_sum': 0.199, 'time_perc': 3.082, 'time_med': 0.199},
+         {'url': '/api/v2/slot/4705/groups', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.704, 'time_max': 0.704, 'time_sum': 0.704, 'time_perc': 10.903, 'time_med': 0.704},
+         {'url': '/api/v2/internal/banner/24294027/info', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.146, 'time_max': 0.146, 'time_sum': 0.146, 'time_perc': 2.261, 'time_med': 0.146},
+         {'url': '/api/v2/group/1769230/banners', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.628, 'time_max': 0.628, 'time_sum': 0.628, 'time_perc': 9.726, 'time_med': 0.628},
+         {'url': '/api/v2/group/7786679/statistic/sites/?date_type=day&date_from=2017-06-28&date_to=2017-06-28', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.067, 'time_max': 0.067, 'time_sum': 0.067, 'time_perc': 1.038, 'time_med': 0.067},
+         {'url': '/api/v2/banner/1717161', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.138, 'time_max': 0.138, 'time_sum': 0.138, 'time_perc': 2.137, 'time_med': 0.138},
+         {'url': '/export/appinstall_raw/2017-06-29/', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.003, 'time_max': 0.003, 'time_sum': 0.003, 'time_perc': 0.046, 'time_med': 0.003},
+         {'url': '/api/v2/slot/4822/groups', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.157, 'time_max': 0.157, 'time_sum': 0.157, 'time_perc': 2.431, 'time_med': 0.157},
+         {'url': '/api/v2/banner/24987703', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.726, 'time_max': 0.726, 'time_sum': 0.726, 'time_perc': 11.244, 'time_med': 0.726},
+         {'url': '/export/appinstall_raw/2017-06-30/', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.001, 'time_max': 0.001, 'time_sum': 0.001, 'time_perc': 0.015, 'time_med': 0.001},
+         {'url': '/api/v2/banner/25020545', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.738, 'time_max': 0.738, 'time_sum': 0.738, 'time_perc': 11.429, 'time_med': 0.738},
+         {'url': '/api/v2/banner/7763463', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.181, 'time_max': 0.181, 'time_sum': 0.181, 'time_perc': 2.803, 'time_med': 0.181},
+         {'url': '/api/v2/banner/16168711', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.19, 'time_max': 0.19, 'time_sum': 0.19, 'time_perc': 2.943, 'time_med': 0.19},
+         {'url': '/api/v2/banner/25023278', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.841, 'time_max': 0.841, 'time_sum': 0.841, 'time_perc': 13.025, 'time_med': 0.841},
+         {'url': '/api/v2/group/7786682/statistic/sites/?date_type=day&date_from=2017-06-28&date_to=2017-06-28', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.068, 'time_max': 0.068, 'time_sum': 0.068, 'time_perc': 1.053, 'time_med': 0.068},
+         {'url': '/api/v2/banner/25013431', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.917, 'time_max': 0.917, 'time_sum': 0.917, 'time_perc': 14.202, 'time_med': 0.917},
+         {'url': '/api/v2/internal/banner/24288647/info', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.072, 'time_max': 0.072, 'time_sum': 0.072, 'time_perc': 1.115, 'time_med': 0.072},
+         {'url': '/api/v2/banner/21456892', 'count': 1, 'count_perc': 5.0, 'time_avg': 0.158, 'time_max': 0.158, 'time_sum': 0.158, 'time_perc': 2.447, 'time_med': 0.158}]
         
         with patch('log_analyzer.get_log_line') as mocked_get_log_line:
-            
             mocked_get_log_line.return_value = [b'1.196.116.32 -  - [29/Jun/2017:03:50:22 +0300] "GET /api/v2/banner/25019354 HTTP/1.1" 200 927 "-" "Lynx/2.8.8dev.9 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/2.10.5" "-" "1498697422-2190034393-4708-9752759" "dc7161be3" 0.390\n',
                                    b'1.99.174.176 3b81f63526fa8  - [29/Jun/2017:03:50:22 +0300] "GET /api/1/photogenic_banners/list/?server_name=WIN7RB4 HTTP/1.1" 200 12 "-" "Python-urllib/2.7" "-" "1498697422-32900793-4708-9752770" "-" 0.133\n',
                                    b'1.169.137.128 -  - [29/Jun/2017:03:50:22 +0300] "GET /api/v2/banner/16852664 HTTP/1.1" 200 19415 "-" "Slotovod" "-" "1498697422-2118016444-4708-9752769" "712e90144abee9" 0.199\n',
@@ -111,10 +99,8 @@ class FunctionsTest(unittest.TestCase):
                                    b'1.196.116.32 -  - [29/Jun/2017:03:50:23 +0300] "GET /api/v2/banner/25013431 HTTP/1.1" 200 948 "-" "Lynx/2.8.8dev.9 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/2.10.5" "-" "1498697422-2190034393-4708-9752758" "dc7161be3" 0.917\n',
                                    b'1.168.65.96 -  - [29/Jun/2017:03:50:23 +0300] "GET /api/v2/internal/banner/24288647/info HTTP/1.1" 200 351 "-" "-" "-" "1498697423-2539198130-4708-9752780" "89f7f1be37d" 0.072\n',
                                    b'1.169.137.128 -  - [29/Jun/2017:03:50:23 +0300] "GET /api/v2/banner/21456892 HTTP/1.1" 200 70795 "-" "Slotovod" "-" "1498697423-2118016444-4708-9752779" "712e90144abee9" 0.158\n']
-            
-            json_table = count_stats("test_path", self.config["REPORT_SIZE"])
-            
-            self.assertEqual(json_table, result)
+            stat = count_stats("test_path")
+            self.assertEqual(stat, result)
         
 if __name__ == '__main__':
     unittest.main()
